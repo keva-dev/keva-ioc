@@ -1,0 +1,105 @@
+plugins {
+    id 'idea'
+    id 'java-library'
+    id 'com.adarshr.test-logger' version '2.1.0'
+    id 'maven-publish'
+    id 'signing'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    if (JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+    }
+}
+
+group 'dev.keva'
+version '0.1.0'
+
+dependencies {
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.22'
+    annotationProcessor 'org.projectlombok:lombok:1.18.22'
+    testCompileOnly 'org.projectlombok:lombok:1.18.22'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
+
+    implementation 'ch.qos.logback:logback-classic:1.2.6'
+    implementation 'ch.qos.logback:logback-core:1.2.6'
+    // SLF4J as a facade
+    implementation 'org.slf4j:slf4j-api:1.7.2'
+
+    // This dependency is used by the application.
+    implementation 'org.reflections:reflections:0.10.1'
+
+    // JUnit
+    testImplementation('org.junit.jupiter:junit-jupiter:5.6.2')
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        outputs.upToDateWhen { false }
+        showStandardStreams = true
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            def releasesRepoUrl = 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
+            def snapshotsRepoUrl = 'https://oss.sonatype.org/content/repositories/snapshots'
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            credentials {
+                username = project.findProperty("sonatypeUsername") ?: System.getenv("sonatypeUsernamer")
+                password = project.findProperty("sonatypePassword") ?: System.getenv("sonatypePassword")
+            }
+        }
+    }
+
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'keva-ioc'
+            from components.java
+            versionMapping {
+                usage('java-api') {
+                    fromResolutionOf('runtimeClasspath')
+                }
+                usage('java-runtime') {
+                    fromResolutionResult()
+                }
+            }
+            pom {
+                name = 'Keva IoC'
+                description = 'Fast, lightweight, Spring like, annotation driven IoC framework'
+                url = 'https://ioc.keva.dev'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://github.com/keva-dev/keva-ioc/blob/master/LICENSE'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'tuhuynh27'
+                        name = 'Tu Huynh'
+                        email = 'huynhminhtufu@gmail.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/keva-dev/keva-ioc.git'
+                    developerConnection = 'scm:git:ssh://github.com:keva-dev/keva-ioc.git'
+                    url = 'https://github.com/keva-dev/keva-ioc'
+                }
+            }
+        }
+    }
+}
