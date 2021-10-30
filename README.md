@@ -12,6 +12,26 @@ Supported annotations:
 - `@Autowired` (field injection, setter injection and constructor injection)
 - `@Qualifier`
 
+## Install
+
+`build.gradle`
+
+```groovy
+dependencies {
+    implementation 'dev.keva:keva-ioc:0.1.0-SNAPSHOT'
+}
+```
+
+`pom.xml`
+
+```xml
+<dependencies>
+    <groupId>dev.keva</groupId>
+    <artifactId>keva-ioc</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependencies>
+```
+
 ## Usage
 
 Engine.java
