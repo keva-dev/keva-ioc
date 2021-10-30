@@ -1,6 +1,7 @@
 plugins {
     id 'idea'
     id 'java-library'
+    id 'application'
     id 'com.adarshr.test-logger' version '2.1.0'
     id 'maven-publish'
     id 'signing'
@@ -22,25 +23,31 @@ javadoc {
 }
 
 group 'dev.keva'
-version '0.1.0'
+version '0.1.0-SNAPSHOT'
+
+configurations {
+    extraLibs
+}
+
+jar {
+    from {
+        configurations.extraLibs.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
 
 dependencies {
-    // Lombok
-    compileOnly 'org.projectlombok:lombok:1.18.22'
-    annotationProcessor 'org.projectlombok:lombok:1.18.22'
-    testCompileOnly 'org.projectlombok:lombok:1.18.22'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
-
-    implementation 'ch.qos.logback:logback-classic:1.2.6'
-    implementation 'ch.qos.logback:logback-core:1.2.6'
     // SLF4J as a facade
     implementation 'org.slf4j:slf4j-api:1.7.2'
 
-    // This dependency is used by the application.
     implementation 'org.reflections:reflections:0.10.1'
+    extraLibs 'org.reflections:reflections:0.10.1'
 
     // JUnit
     testImplementation('org.junit.jupiter:junit-jupiter:5.6.2')
+}
+
+application {
+    mainClassName = 'dev.keva.ioc.Main'
 }
 
 test {
@@ -103,3 +110,10 @@ publishing {
         }
     }
 }
+
+signing {
+    sign publishing.publications.mavenJava
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_9

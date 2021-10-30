@@ -1,16 +1,12 @@
 package dev.keva.ioc;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.LoggerContext;
 import dev.keva.ioc.annotation.Autowired;
 import dev.keva.ioc.annotation.Component;
 import dev.keva.ioc.annotation.ComponentScan;
 import dev.keva.ioc.annotation.Qualifier;
 import dev.keva.ioc.exception.IoCException;
 import dev.keva.ioc.utils.ClassLoaderUtil;
-import lombok.extern.slf4j.Slf4j;
 import org.reflections.Reflections;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -20,13 +16,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
 public class KevaIoC {
-    static {
-        LoggerContext ctx = (LoggerContext) LoggerFactory.getILoggerFactory();
-        ctx.getLogger("org.reflections").setLevel(Level.OFF);
-    }
-
     private final Map<Class<?>, Class<?>> implementationsMap;
     private final Map<Class<?>, Object> beansMap;
     private final Map<Class<?>, Integer> circularDetectMap;
