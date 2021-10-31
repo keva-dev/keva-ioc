@@ -88,10 +88,10 @@ Browser.java
 @Component
 public class Browser {
     @Autowired
-    private String version;
+    String version;
     
-    private final Engine engine;
-    private final BrowserRenderer renderer;
+    Engine engine;
+    BrowserRenderer renderer;
 
     @Autowired
     public Browser(@Qualifier("v8Engine") Engine engine, BrowserRenderer renderer) {

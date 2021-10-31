@@ -43,6 +43,9 @@ dependencies {
 
     // JUnit
     testImplementation('org.junit.jupiter:junit-jupiter:5.8.1')
+
+    testImplementation 'ch.qos.logback:logback-classic:1.2.6'
+    testImplementation 'ch.qos.logback:logback-core:1.2.6'
 }
 
 test {
