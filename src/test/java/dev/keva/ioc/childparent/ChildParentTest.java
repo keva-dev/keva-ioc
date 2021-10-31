@@ -1,7 +1,7 @@
-package dev.keva.ioc;
+package dev.keva.ioc.childparent;
 
+import dev.keva.ioc.KevaIoC;
 import dev.keva.ioc.annotation.ComponentScan;
-import dev.keva.ioc.childparent.Child;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +13,7 @@ public class ChildParentTest {
 
     @BeforeAll
     static void init() {
-        kevaIoC = KevaIoC.initBeans(PackageMultipleTest.class);
+        kevaIoC = KevaIoC.initBeans(ChildParentTest.class);
     }
 
     @Test

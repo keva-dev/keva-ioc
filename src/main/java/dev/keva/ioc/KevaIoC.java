@@ -1,11 +1,14 @@
 package dev.keva.ioc;
 
-import dev.keva.ioc.annotation.Autowired;
-import dev.keva.ioc.annotation.Component;
-import dev.keva.ioc.annotation.ComponentScan;
-import dev.keva.ioc.annotation.Qualifier;
+import dev.keva.ioc.annotation.*;
+import dev.keva.ioc.core.BeanContainer;
+import dev.keva.ioc.core.CircularDetector;
+import dev.keva.ioc.core.ImplementationContainer;
+import dev.keva.ioc.exception.IoCBeanNotFound;
+import dev.keva.ioc.exception.IoCCircularDepException;
 import dev.keva.ioc.exception.IoCException;
 import dev.keva.ioc.utils.ClassLoaderUtil;
+import dev.keva.ioc.utils.FinderUtil;
 import org.reflections.Reflections;
 
 import java.io.IOException;
@@ -14,50 +17,40 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class KevaIoC {
-    private final Map<Class<?>, Class<?>> implementationsMap;
-    private final Map<Class<?>, Object> beansMap;
-    private final Map<Class<?>, Integer> circularDetectMap;
-
-    private static KevaIoC kevaIoc;
+    private final BeanContainer beanContainer = new BeanContainer();
+    private final ImplementationContainer implementationContainer = new ImplementationContainer();
+    private final CircularDetector circularDetector = new CircularDetector();
 
     private KevaIoC() {
-        implementationsMap = new HashMap<>();
-        beansMap = new HashMap<>();
-        circularDetectMap = new HashMap<>();
     }
 
     public static KevaIoC initBeans(Class<?> mainClass) {
         try {
-            synchronized (KevaIoC.class) {
-                if (kevaIoc == null) {
-                    kevaIoc = new KevaIoC();
-                    kevaIoc.initWrapper(mainClass);
-                }
-            }
-            return kevaIoc;
-        } catch (IOException | ClassNotFoundException | InstantiationException |
-                IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            KevaIoC instance = new KevaIoC();
+            instance.initWrapper(mainClass);
+            return instance;
+        } catch (IOException | ClassNotFoundException | InstantiationException | IllegalAccessException |
+                InvocationTargetException | NoSuchMethodException | IoCBeanNotFound | IoCCircularDepException e) {
             throw new IoCException(e);
         }
     }
 
     public <T> T getBean(Class<T> clazz) {
         try {
-            return kevaIoc._getBean(clazz);
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            return _getBean(clazz);
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                NoSuchMethodException | IoCBeanNotFound | IoCCircularDepException e) {
             throw new IoCException(e);
         }
     }
 
     private void initWrapper(Class<?> mainClass) throws IOException, ClassNotFoundException, InstantiationException,
-            IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+            IllegalAccessException, NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException {
         ComponentScan scan = mainClass.getAnnotation(ComponentScan.class);
         if (scan != null) {
             String[] packages = scan.value();
-            System.out.println(Arrays.toString(packages));
             for (String packageName : packages) {
                 init(packageName);
             }
@@ -67,21 +60,50 @@ public class KevaIoC {
     }
 
     private void init(String packageName) throws IOException, ClassNotFoundException, InstantiationException,
-            IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+            IllegalAccessException, NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException {
         List<Class<?>> classes = ClassLoaderUtil.getClasses(packageName);
+        scanImplementations(packageName);
+        scanConfigurationClass(classes);
+        scanComponentClasses(classes);
+    }
+
+    private void scanImplementations(String packageName) {
         Reflections reflections = new Reflections(packageName);
         Set<Class<?>> types = reflections.getTypesAnnotatedWith(Component.class);
         for (Class<?> implementationClass : types) {
             Class<?>[] interfaces = implementationClass.getInterfaces();
             if (interfaces.length == 0) {
-                implementationsMap.put(implementationClass, implementationClass);
+                implementationContainer.put(implementationClass, implementationClass);
             } else {
                 for (Class<?> interfaceClass : interfaces) {
-                    implementationsMap.put(implementationClass, interfaceClass);
+                    implementationContainer.put(implementationClass, interfaceClass);
                 }
             }
         }
+    }
 
+    private void scanConfigurationClass(List<Class<?>> classes) throws IoCCircularDepException, InvocationTargetException,
+            IllegalAccessException, InstantiationException, NoSuchMethodException {
+        Deque<Class<?>> configurationClassesQ = new ArrayDeque<>(5);
+        for (Class<?> clazz : classes) {
+            if (clazz.isAnnotationPresent(Configuration.class)) {
+                configurationClassesQ.add(clazz);
+            }
+        }
+        while (!configurationClassesQ.isEmpty()) {
+            Class<?> configurationClass = configurationClassesQ.removeFirst();
+            Object instance = configurationClass.getConstructor().newInstance();
+            try {
+                circularDetector.detect(configurationClass);
+                scanConfigurationBeans(configurationClass, instance);
+            } catch (IoCBeanNotFound e) {
+                configurationClassesQ.addLast(configurationClass);
+            }
+        }
+    }
+
+    private void scanComponentClasses(List<Class<?>> classes) throws IoCCircularDepException, InvocationTargetException,
+            IllegalAccessException, InstantiationException, NoSuchMethodException, IoCBeanNotFound {
         for (Class<?> clazz : classes) {
             if (clazz.isAnnotationPresent(Component.class)) {
                 newInstanceWrapper(clazz);
@@ -89,29 +111,45 @@ public class KevaIoC {
         }
     }
 
-    private Object newInstanceWrapper(Class<?> clazz) throws InvocationTargetException,
-            IllegalAccessException, InstantiationException, NoSuchMethodException {
-        if (beansMap.containsKey(clazz)) {
-            return beansMap.get(clazz);
+    private void scanConfigurationBeans(Class<?> clazz, Object classInstance) throws InvocationTargetException, IllegalAccessException,
+            InstantiationException, NoSuchMethodException, IoCBeanNotFound, IoCCircularDepException {
+        Set<Method> methods = FinderUtil.findMethods(clazz, Bean.class);
+        Set<Field> fields = FinderUtil.findFields(clazz, Autowired.class);
+
+        for (Field field : fields) {
+            String qualifier = field.isAnnotationPresent(Qualifier.class) ? field.getAnnotation(Qualifier.class).value() : null;
+            Object fieldInstance = _getBean(field.getType(), field.getName(), qualifier, false);
+            field.set(classInstance, fieldInstance);
         }
 
-        int circular = circularDetectMap.getOrDefault(clazz, 0);
-        circularDetectMap.put(clazz, circular + 1);
-        // Need to be changed
-        if (circular > 50) {
-            throw new IoCException("Circular dependency detected when loading class " + clazz.getName());
+        for (Method method : methods) {
+            Class<?> beanType = method.getReturnType();
+            Object beanInstance = method.invoke(classInstance);
+            String name = method.getAnnotation(Bean.class).value() != null ?
+                    method.getAnnotation(Bean.class).value() : beanType.getName();
+            beanContainer.putBean(beanType, beanInstance, name);
         }
+    }
+
+    private Object newInstanceWrapper(Class<?> clazz) throws InvocationTargetException,
+            IllegalAccessException, InstantiationException, NoSuchMethodException, IoCBeanNotFound, IoCCircularDepException {
+        if (beanContainer.containsBean(clazz)) {
+            return beanContainer.getBean(clazz);
+        }
+
+        circularDetector.detect(clazz);
 
         Object instance = newInstance(clazz);
-        beansMap.put(clazz, instance);
+        beanContainer.putBean(clazz, instance);
         fieldInject(clazz, instance);
         setterInject(clazz, instance);
         return instance;
     }
 
     private Object newInstance(Class<?> clazz) throws IllegalAccessException,
-            InstantiationException, InvocationTargetException, NoSuchMethodException {
-        Constructor<?> annotatedConstructor = findAnnotatedConstructor(clazz);
+            InstantiationException, InvocationTargetException, NoSuchMethodException,
+            IoCBeanNotFound, IoCCircularDepException {
+        Constructor<?> annotatedConstructor = FinderUtil.findAnnotatedConstructor(clazz);
         Object instance;
         if (annotatedConstructor == null) {
             try {
@@ -127,7 +165,7 @@ public class KevaIoC {
             for (int i = 0; i < parameters.length; i++) {
                 String qualifier = annotatedConstructor.getParameters()[i].isAnnotationPresent(Qualifier.class) ?
                         annotatedConstructor.getParameters()[i].getAnnotation(Qualifier.class).value() : null;
-                Object depInstance = _getBean(annotatedConstructor.getParameterTypes()[i], annotatedConstructor.getParameterTypes()[i].getName(), qualifier);
+                Object depInstance = _getBean(annotatedConstructor.getParameterTypes()[i], annotatedConstructor.getParameterTypes()[i].getName(), qualifier, true);
                 parameters[i] = depInstance;
             }
             instance = annotatedConstructor.newInstance(parameters);
@@ -135,116 +173,54 @@ public class KevaIoC {
         return instance;
     }
 
-    private Constructor<?> findAnnotatedConstructor(Class<?> clazz) {
-        for (Constructor<?> constructor : clazz.getDeclaredConstructors()) {
-            if (constructor.isAnnotationPresent(Autowired.class)) {
-                constructor.setAccessible(true);
-                return constructor;
-            }
-        }
-        return null;
-    }
-
     private void setterInject(Class<?> clazz, Object classInstance) throws IllegalAccessException,
-            InvocationTargetException, NoSuchMethodException, InstantiationException {
-        Set<Method> methods = findMethods(clazz);
+            InvocationTargetException, NoSuchMethodException, InstantiationException, IoCBeanNotFound, IoCCircularDepException {
+        Set<Method> methods = FinderUtil.findMethods(clazz, Autowired.class);
         for (Method method : methods) {
-            if (method.isAnnotationPresent(Autowired.class)) {
-                method.setAccessible(true);
-                Object[] parameters = new Object[method.getParameterCount()];
-                for (int i = 0; i < parameters.length; i++) {
-                    String qualifier = method.getParameters()[i].isAnnotationPresent(Qualifier.class) ?
-                            method.getParameters()[i].getAnnotation(Qualifier.class).value() : null;
-                    Object instance = _getBean(method.getParameterTypes()[i], method.getParameterTypes()[i].getName(), qualifier);
-                    parameters[i] = instance;
-                }
-                method.invoke(classInstance, parameters);
+            Object[] parameters = new Object[method.getParameterCount()];
+            for (int i = 0; i < parameters.length; i++) {
+                String qualifier = method.getParameters()[i].isAnnotationPresent(Qualifier.class) ?
+                        method.getParameters()[i].getAnnotation(Qualifier.class).value() : null;
+                Object instance = _getBean(method.getParameterTypes()[i], method.getParameterTypes()[i].getName(), qualifier, true);
+                parameters[i] = instance;
             }
+            method.invoke(classInstance, parameters);
         }
-    }
-
-    private Set<Method> findMethods(Class<?> clazz) {
-        Set<Method> set = new HashSet<>();
-        while (clazz != null) {
-            for (Method method : clazz.getDeclaredMethods()) {
-                if (method.isAnnotationPresent(Autowired.class)) {
-                    method.setAccessible(true);
-                    set.add(method);
-                }
-            }
-            clazz = clazz.getSuperclass();
-        }
-        return set;
     }
 
     private void fieldInject(Class<?> clazz, Object classInstance) throws IllegalAccessException,
-            InstantiationException, InvocationTargetException, NoSuchMethodException {
-        Set<Field> fields = findFields(clazz);
+            InstantiationException, InvocationTargetException, NoSuchMethodException, IoCBeanNotFound, IoCCircularDepException {
+        Set<Field> fields = FinderUtil.findFields(clazz, Autowired.class);
         for (Field field : fields) {
             String qualifier = field.isAnnotationPresent(Qualifier.class) ? field.getAnnotation(Qualifier.class).value() : null;
-            Object fieldInstance = _getBean(field.getType(), field.getName(), qualifier);
+            Object fieldInstance = _getBean(field.getType(), field.getName(), qualifier, true);
             field.set(classInstance, fieldInstance);
         }
     }
 
-    private Set<Field> findFields(Class<?> clazz) {
-        Set<Field> set = new HashSet<>();
-        while (clazz != null) {
-            for (Field field : clazz.getDeclaredFields()) {
-                if (field.isAnnotationPresent(Autowired.class)) {
-                    field.setAccessible(true);
-                    set.add(field);
-                }
-            }
-            clazz = clazz.getSuperclass();
-        }
-        return set;
-    }
-
     @SuppressWarnings("unchecked")
     private <T> T _getBean(Class<T> interfaceClass) throws InstantiationException, IllegalAccessException,
-            InvocationTargetException, NoSuchMethodException {
-        return (T) _getBean(interfaceClass, null, null);
+            InvocationTargetException, NoSuchMethodException, IoCBeanNotFound, IoCCircularDepException {
+        return (T) _getBean(interfaceClass, null, null, false);
     }
 
-    private <T> Object _getBean(Class<T> interfaceClass, String fieldName, String qualifier) throws
-            InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    private <T> Object _getBean(Class<T> interfaceClass, String fieldName, String qualifier, boolean createIfNotFound) throws
+            InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException,
+            IoCBeanNotFound, IoCCircularDepException {
         Class<?> implementationClass = interfaceClass.isInterface() ?
-                getImplementationClass(interfaceClass, fieldName, qualifier) : interfaceClass;
-        if (beansMap.containsKey(implementationClass)) {
-            return beansMap.get(implementationClass);
-        }
-        synchronized (beansMap) {
-            return newInstanceWrapper(implementationClass);
-        }
-    }
-
-    private Class<?> getImplementationClass(Class<?> interfaceClass, final String fieldName, final String qualifier) {
-        Set<Map.Entry<Class<?>, Class<?>>> implementationClasses =
-                implementationsMap.entrySet().stream().filter(entry ->
-                        entry.getValue() == interfaceClass).collect(Collectors.toSet());
-        String errorMessage;
-        if (implementationClasses.isEmpty()) {
-            errorMessage = "No implementation found for interface " + interfaceClass.getName();
-        } else if (implementationClasses.size() == 1) {
-            Optional<Map.Entry<Class<?>, Class<?>>> optional = implementationClasses.stream().findFirst();
-            return optional.get().getKey();
-        } else {
-            final String findBy = (qualifier == null || qualifier.trim().length() == 0) ? fieldName : qualifier;
-            Optional<Map.Entry<Class<?>, Class<?>>> optional =
-                    implementationClasses.stream()
-                            .filter(entry ->
-                                    entry.getKey().getSimpleName()
-                                            .equalsIgnoreCase(findBy)).findAny();
-            if (optional.isPresent()) {
-                return optional.get().getKey();
-            } else {
-                errorMessage = "There are " + implementationClasses.size()
-                        + " of interface " + interfaceClass.getName()
-                        + " Expected single implementation or make use of"
-                        + " @Qualifier to resolve conflict";
+                implementationContainer.getImplementationClass(interfaceClass, fieldName, qualifier) : interfaceClass;
+        if (beanContainer.containsBean(implementationClass)) {
+            if (qualifier != null) {
+                return beanContainer.getBean(implementationClass, qualifier);
             }
+            return beanContainer.getBean(implementationClass);
         }
-        throw new IoCException(errorMessage);
+        if (createIfNotFound) {
+            synchronized (beanContainer) {
+                return newInstanceWrapper(implementationClass);
+            }
+        } else {
+             throw new IoCBeanNotFound("Cannot found bean for " + interfaceClass.getName());
+        }
     }
 }

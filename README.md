@@ -9,7 +9,9 @@ Supported annotations:
 
 - `@ComponentScan`
 - `@Component`
-- `@Autowired` (field injection, setter injection and constructor injection)
+- `@Configuration`
+- `@Bean`
+- `@Autowired` (supports field injection, setter injection and constructor injection)
 - `@Qualifier`
 
 ## Install
@@ -64,11 +66,26 @@ public class SpiderMonkeyEngine implements Engine {
 }
 ```
 
+Config.java
+
+```java
+@Configuration
+public class Configuration {
+    @Bean("version")
+    public String version() {
+        return "1.0";
+    }
+}
+```
+
 Browser.java
 
 ```java
 @Component
 public class Browser {
+    @Autowired
+    private String version;
+    
     private final Engine engine;
     private final BrowserRenderer renderer;
 
@@ -80,6 +97,10 @@ public class Browser {
 
     public String run() {
         return renderer.render("This browser run on " + engine.getName());
+    }
+    
+    public String getVersion() {
+        return renderer.render("Browser version: " + version);
     }
 }
 ```

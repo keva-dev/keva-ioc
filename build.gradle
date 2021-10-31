@@ -1,7 +1,6 @@
 plugins {
     id 'idea'
     id 'java-library'
-    id 'application'
     id 'com.adarshr.test-logger' version '2.1.0'
     id 'maven-publish'
     id 'signing'
@@ -37,17 +36,13 @@ jar {
 
 dependencies {
     // SLF4J as a facade
-    implementation 'org.slf4j:slf4j-api:1.7.2'
+    implementation 'org.slf4j:slf4j-api:1.7.32'
 
     implementation 'org.reflections:reflections:0.10.1'
     extraLibs 'org.reflections:reflections:0.10.1'
 
     // JUnit
-    testImplementation('org.junit.jupiter:junit-jupiter:5.6.2')
-}
-
-application {
-    mainClassName = 'dev.keva.ioc.Main'
+    testImplementation('org.junit.jupiter:junit-jupiter:5.8.1')
 }
 
 test {
