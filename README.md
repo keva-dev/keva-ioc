@@ -5,7 +5,16 @@ Fast, lightweight, Spring like, annotation driven IoC framework.
 Designed specifically for small applications, that has to have small memory footprint, small jar size and fast startup time,
 for example plugins, (embedded) standalone application, integration tests, jobs, Android applications, etc.
 
-Supported annotations:
+While Spring IoC is great, but even with absolute minimal number of dependencies has a large size (in jars), it also takes long to start it up.
+Spring is very opinionated, it's easy to be locked-in Spring ecosystem. Also, it has fairly large memory footprint that is not good for embedded applications.
+
+## Features
+
+- Spring-like annotation-support, no XML
+- Fast startup time, small memory footprint (see performance section soon)
+- Pocket-sized, only basic features (no bean's lifecycle, no "Spring's magic")
+
+## Supported Annotations
 
 - `@ComponentScan`
 - `@Component`
@@ -29,17 +38,7 @@ dependencies {
 }
 ```
 
-`pom.xml`
-
-```xml
-<dependencies>
-    <groupId>dev.keva</groupId>
-    <artifactId>keva-ioc</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-</dependencies>
-```
-
-## Usage
+## Usages
 
 Engine.java
 
