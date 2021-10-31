@@ -8,6 +8,11 @@ for example plugins, (embedded) standalone application, integration tests, jobs,
 While Spring IoC is great, but even with absolute minimal number of dependencies has a large size (in jars), it also takes long to start it up.
 Spring is very opinionated, it's easy to be locked-in Spring ecosystem. Also, it has fairly large memory footprint that is not good for embedded applications.
 
+![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/keva-dev/keva-ioc/Build/master?label=build&style=flat-square)
+![Lines of code](https://img.shields.io/tokei/lines/github/keva-dev/keva-ioc?style=flat-square)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/keva-dev/keva-ioc?style=flat-square)
+![GitHub](https://img.shields.io/github/license/keva-dev/keva-ioc?style=flat-square)
+
 ## Features
 
 - Spring-like annotation-support, no XML
