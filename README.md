@@ -18,6 +18,7 @@ Spring is very opinionated, it's easy to be locked-in Spring ecosystem. Also, it
 - Spring-like annotation-support, no XML
 - Fast startup time, small memory footprint (see performance section soon)
 - Pocket-sized, only basic features (no bean's lifecycle, no "Spring's magic")
+- Less opinionated, support mount existing beans (means can integrate well with other IoC/DI frameworks)
 
 ## Supported Annotations
 
@@ -27,6 +28,7 @@ Spring is very opinionated, it's easy to be locked-in Spring ecosystem. Also, it
 - `@Bean`
 - `@Autowired` (supports field injection, setter injection and constructor injection)
 - `@Qualifier`
+- Support mount existing beans via `.initBeans(Main.class, beanOne, beanTwo...)` static method
 
 ## Install
 
