@@ -2,30 +2,53 @@ package dev.keva.ioc.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Stream;
 
 public class ClassLoaderUtil {
-    public static List<Class<?>> getClasses(String packageName) throws ClassNotFoundException, IOException {
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        assert classLoader != null;
-        String path = packageName.replace('.', '/');
-        Enumeration<URL> resources = classLoader.getResources(path);
-        List<File> dirs = new ArrayList<>();
-        while (resources.hasMoreElements()) {
-            URL resource = resources.nextElement();
-            dirs.add(new File(resource.getFile()));
-        }
+    public static List<Class<?>> getClasses(String packageName) throws IOException, URISyntaxException, ClassNotFoundException {
         List<Class<?>> classes = new ArrayList<>();
-        for (File directory : dirs) {
-            classes.addAll(findClasses(directory, packageName));
+        String path = packageName.replace('.', '/');
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        URI pkg = Objects.requireNonNull(classLoader.getResource(path)).toURI();
+        if (pkg.toString().startsWith("jar:")) {
+            Path root;
+            try {
+                root = FileSystems.getFileSystem(pkg).getPath(path);
+            } catch (FileSystemNotFoundException e) {
+                root = FileSystems.newFileSystem(pkg, Collections.emptyMap()).getPath(path);
+            }
+
+            String extension = ".class";
+            try (Stream<Path> allPaths = Files.walk(root)) {
+                allPaths.filter(Files::isRegularFile).forEach(file -> {
+                    try {
+                        String filePath = file.toString().replace('/', '.');
+                        String fileName = filePath.substring(filePath.indexOf(packageName), filePath.length() - extension.length());
+                        classes.add(Class.forName(fileName));
+                    } catch (ClassNotFoundException | StringIndexOutOfBoundsException ignored) {
+                    }
+                });
+            }
+        } else {
+            Enumeration<URL> resources = classLoader.getResources(path);
+            List<File> dirs = new ArrayList<>();
+            while (resources.hasMoreElements()) {
+                URL resource = resources.nextElement();
+                dirs.add(new File(resource.getFile()));
+            }
+            for (File directory : dirs) {
+                classes.addAll(findClasses(directory, packageName));
+            }
         }
         return classes;
     }
 
-    public static List<Class<?>> findClasses(File directory, String packageName) throws ClassNotFoundException {
+    private static List<Class<?>> findClasses(File directory, String packageName) throws ClassNotFoundException {
         List<Class<?>> classes = new ArrayList<>();
         if (!directory.exists()) {
             return classes;

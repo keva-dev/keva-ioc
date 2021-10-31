@@ -16,6 +16,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URISyntaxException;
 import java.util.*;
 
 public class KevaIoC {
@@ -32,7 +33,7 @@ public class KevaIoC {
             instance.initWrapper(mainClass, predefinedBeans);
             return instance;
         } catch (IOException | ClassNotFoundException | InstantiationException | IllegalAccessException |
-                InvocationTargetException | NoSuchMethodException | IoCBeanNotFound | IoCCircularDepException e) {
+                InvocationTargetException | NoSuchMethodException | IoCBeanNotFound | IoCCircularDepException | URISyntaxException e) {
             throw new IoCException(e);
         }
     }
@@ -46,8 +47,9 @@ public class KevaIoC {
         }
     }
 
-    private void initWrapper(Class<?> mainClass, Object[] predefinedBeans) throws IOException, ClassNotFoundException, InstantiationException,
-            IllegalAccessException, NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException {
+    private void initWrapper(Class<?> mainClass, Object[] predefinedBeans) throws IOException, ClassNotFoundException,
+            InstantiationException, IllegalAccessException, NoSuchMethodException,
+            InvocationTargetException, IoCBeanNotFound, IoCCircularDepException, URISyntaxException {
         if (predefinedBeans != null && predefinedBeans.length > 0) {
            for (Object bean : predefinedBeans) {
                implementationContainer.putImplementationClass(bean.getClass(), bean.getClass());
@@ -66,8 +68,9 @@ public class KevaIoC {
         }
     }
 
-    private void init(String packageName) throws IOException, ClassNotFoundException, InstantiationException,
-            IllegalAccessException, NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException {
+    private void init(String packageName) throws IOException, InstantiationException, IllegalAccessException,
+            NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException, URISyntaxException,
+            ClassNotFoundException {
         beanContainer.putBean(KevaIoC.class, this);
         implementationContainer.putImplementationClass(KevaIoC.class, KevaIoC.class);
         List<Class<?>> classes = ClassLoaderUtil.getClasses(packageName);
@@ -182,7 +185,8 @@ public class KevaIoC {
             for (int i = 0; i < parameters.length; i++) {
                 String qualifier = annotatedConstructor.getParameters()[i].isAnnotationPresent(Qualifier.class) ?
                         annotatedConstructor.getParameters()[i].getAnnotation(Qualifier.class).value() : null;
-                Object depInstance = _getBean(annotatedConstructor.getParameterTypes()[i], annotatedConstructor.getParameterTypes()[i].getName(), qualifier, true);
+                Object depInstance = _getBean(annotatedConstructor.getParameterTypes()[i],
+                        annotatedConstructor.getParameterTypes()[i].getName(), qualifier, true);
                 parameters[i] = depInstance;
             }
             instance = annotatedConstructor.newInstance(parameters);
@@ -198,7 +202,8 @@ public class KevaIoC {
             for (int i = 0; i < parameters.length; i++) {
                 String qualifier = method.getParameters()[i].isAnnotationPresent(Qualifier.class) ?
                         method.getParameters()[i].getAnnotation(Qualifier.class).value() : null;
-                Object instance = _getBean(method.getParameterTypes()[i], method.getParameterTypes()[i].getName(), qualifier, true);
+                Object instance = _getBean(method.getParameterTypes()[i],
+                        method.getParameterTypes()[i].getName(), qualifier, true);
                 parameters[i] = instance;
             }
             method.invoke(classInstance, parameters);
@@ -237,7 +242,7 @@ public class KevaIoC {
                 return newInstanceWrapper(implementationClass);
             }
         } else {
-             throw new IoCBeanNotFound("Cannot found bean for " + interfaceClass.getName());
+            throw new IoCBeanNotFound("Cannot found bean for " + interfaceClass.getName());
         }
     }
 }
