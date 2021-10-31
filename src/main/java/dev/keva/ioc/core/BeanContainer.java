@@ -15,7 +15,7 @@ public class BeanContainer {
 
     public void putBean(Class<?> clazz, Object instance, String name) {
         Map<String, Object> map = beans.computeIfAbsent(clazz, k -> new TreeMap<>());
-        map.put(name, instance);
+        map.putIfAbsent(name, instance);
     }
 
     public boolean containsBean(Class<?> clazz) {

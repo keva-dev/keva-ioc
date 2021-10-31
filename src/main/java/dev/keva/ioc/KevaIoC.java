@@ -26,10 +26,10 @@ public class KevaIoC {
     private KevaIoC() {
     }
 
-    public static KevaIoC initBeans(Class<?> mainClass) {
+    public static KevaIoC initBeans(Class<?> mainClass, Object... predefinedBeans) {
         try {
             KevaIoC instance = new KevaIoC();
-            instance.initWrapper(mainClass);
+            instance.initWrapper(mainClass, predefinedBeans);
             return instance;
         } catch (IOException | ClassNotFoundException | InstantiationException | IllegalAccessException |
                 InvocationTargetException | NoSuchMethodException | IoCBeanNotFound | IoCCircularDepException e) {
@@ -46,8 +46,15 @@ public class KevaIoC {
         }
     }
 
-    private void initWrapper(Class<?> mainClass) throws IOException, ClassNotFoundException, InstantiationException,
+    private void initWrapper(Class<?> mainClass, Object[] predefinedBeans) throws IOException, ClassNotFoundException, InstantiationException,
             IllegalAccessException, NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException {
+        if (predefinedBeans != null && predefinedBeans.length > 0) {
+           for (Object bean : predefinedBeans) {
+               implementationContainer.putImplementationClass(bean.getClass(), bean.getClass());
+               beanContainer.putBean(bean.getClass(), bean);
+           }
+        }
+
         ComponentScan scan = mainClass.getAnnotation(ComponentScan.class);
         if (scan != null) {
             String[] packages = scan.value();
