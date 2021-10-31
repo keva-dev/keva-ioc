@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 public class ImplementationContainer {
     private final Map<Class<?>, Class<?>> implementationsMap = new HashMap<>(10);
 
-    public void put(Class<?> implementationClass, Class<?> interfaceClass) {
+    public void putImplementationClass(Class<?> implementationClass, Class<?> interfaceClass) {
         implementationsMap.put(implementationClass, interfaceClass);
     }
 

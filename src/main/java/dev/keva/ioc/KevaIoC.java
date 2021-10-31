@@ -61,6 +61,8 @@ public class KevaIoC {
 
     private void init(String packageName) throws IOException, ClassNotFoundException, InstantiationException,
             IllegalAccessException, NoSuchMethodException, InvocationTargetException, IoCBeanNotFound, IoCCircularDepException {
+        beanContainer.putBean(KevaIoC.class, this);
+        implementationContainer.putImplementationClass(KevaIoC.class, KevaIoC.class);
         List<Class<?>> classes = ClassLoaderUtil.getClasses(packageName);
         scanImplementations(packageName);
         scanConfigurationClass(classes);
@@ -69,15 +71,23 @@ public class KevaIoC {
 
     private void scanImplementations(String packageName) {
         Reflections reflections = new Reflections(packageName);
-        Set<Class<?>> types = reflections.getTypesAnnotatedWith(Component.class);
-        for (Class<?> implementationClass : types) {
+        Set<Class<?>> componentClasses = reflections.getTypesAnnotatedWith(Component.class);
+        for (Class<?> implementationClass : componentClasses) {
             Class<?>[] interfaces = implementationClass.getInterfaces();
             if (interfaces.length == 0) {
-                implementationContainer.put(implementationClass, implementationClass);
+                implementationContainer.putImplementationClass(implementationClass, implementationClass);
             } else {
                 for (Class<?> interfaceClass : interfaces) {
-                    implementationContainer.put(implementationClass, interfaceClass);
+                    implementationContainer.putImplementationClass(implementationClass, interfaceClass);
                 }
+            }
+        }
+        Set<Class<?>> configurationClasses = reflections.getTypesAnnotatedWith(Configuration.class);
+        for (Class<?> configurationClass : configurationClasses) {
+            Set<Method> methods = FinderUtil.findMethods(configurationClass, Bean.class);
+            for (Method method : methods) {
+                Class<?> returnType = method.getReturnType();
+                implementationContainer.putImplementationClass(returnType, returnType);
             }
         }
     }
@@ -92,8 +102,8 @@ public class KevaIoC {
         }
         while (!configurationClassesQ.isEmpty()) {
             Class<?> configurationClass = configurationClassesQ.removeFirst();
-            Object instance = configurationClass.getConstructor().newInstance();
             try {
+                Object instance = configurationClass.getConstructor().newInstance();
                 circularDetector.detect(configurationClass);
                 scanConfigurationBeans(configurationClass, instance);
             } catch (IoCBeanNotFound e) {
@@ -155,7 +165,7 @@ public class KevaIoC {
             try {
                 Constructor<?> defaultConstructor = clazz.getConstructor();
                 defaultConstructor.setAccessible(true);
-                instance = defaultConstructor.newInstance();
+                instance = clazz.newInstance();
                 return instance;
             } catch (NoSuchMethodException e) {
                 throw new IoCException("There is no default constructor in class " + clazz.getName());
