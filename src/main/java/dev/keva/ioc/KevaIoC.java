@@ -52,7 +52,14 @@ public class KevaIoC {
             InvocationTargetException, IoCBeanNotFound, IoCCircularDepException, URISyntaxException {
         if (predefinedBeans != null && predefinedBeans.length > 0) {
            for (Object bean : predefinedBeans) {
-               implementationContainer.putImplementationClass(bean.getClass(), bean.getClass());
+               Class<?>[] interfaces = bean.getClass().getInterfaces();
+               if (interfaces.length == 0) {
+                   implementationContainer.putImplementationClass(bean.getClass(), bean.getClass());
+               } else {
+                   for (Class<?> interfaceClass : interfaces) {
+                       implementationContainer.putImplementationClass(bean.getClass(), interfaceClass);
+                   }
+               }
                beanContainer.putBean(bean.getClass(), bean);
            }
         }
