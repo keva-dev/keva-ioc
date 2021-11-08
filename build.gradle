@@ -22,7 +22,7 @@ javadoc {
 }
 
 group 'dev.keva'
-version '0.1.0-SNAPSHOT'
+version '1.0.0'
 
 configurations {
     extraLibs
@@ -38,8 +38,8 @@ dependencies {
     // SLF4J as a facade
     implementation 'org.slf4j:slf4j-api:1.7.32'
 
-    implementation 'org.reflections:reflections:0.10.1'
-    extraLibs 'org.reflections:reflections:0.10.1'
+    implementation 'org.reflections:reflections:0.10.2'
+    extraLibs 'org.reflections:reflections:0.10.2'
 
     // JUnit
     testImplementation('org.junit.jupiter:junit-jupiter:5.8.1')
