@@ -36,13 +36,8 @@ Spring is very opinionated, it's easy to be locked-in Spring ecosystem. Also, it
 `build.gradle`
 
 ```groovy
-repositories {
-    // ...
-    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots" }
-}
-
 dependencies {
-    implementation 'dev.keva:keva-ioc:0.1.0-SNAPSHOT'
+    implementation 'dev.keva:keva-ioc:1.0.0'
 }
 ```
 
