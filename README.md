@@ -37,7 +37,7 @@ Spring is very opinionated, it's easy to be locked-in Spring ecosystem. Also, it
 
 ```groovy
 dependencies {
-    implementation 'dev.keva:keva-ioc:1.0.0'
+    implementation 'dev.keva:keva-ioc:1.0.1'
 }
 ```
 
