@@ -2,7 +2,7 @@ package dev.keva.ioc;
 
 import dev.keva.ioc.annotation.*;
 import dev.keva.ioc.core.BeanContainer;
-import dev.keva.ioc.core.CircularDetector;
+import dev.keva.ioc.core.CircularDependencyDetector;
 import dev.keva.ioc.core.ImplementationContainer;
 import dev.keva.ioc.exception.IoCBeanNotFound;
 import dev.keva.ioc.exception.IoCCircularDepException;
@@ -19,10 +19,48 @@ import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.util.*;
 
+/**
+ * KevaIoC - A lightweight dependency injection and inversion of control container.
+ * The class provides mechanisms for scanning, registering, and resolving dependencies among components
+ * marked with specific annotations within a Java application. It supports component lifecycle management
+ * through dependency injection patterns such as constructor injection, setter injection, and field injection.
+ *
+ * Key Features:
+ * - Component scanning based on package names and annotations.
+ * - Registration of components, either predefined or discovered via component scanning.
+ * - Resolution of components ensuring dependencies are satisfied and handling lifecycle appropriately.
+ * - Detection and handling of circular dependencies among components.
+ * - Exception handling to manage errors related to bean instantiation, circular dependencies, and missing beans.
+ *
+ * Usage:
+ * - To use this container, the user must call the static method `initBeans` with the main class and any predefined beans.
+ * - Beans can be fetched using the `getBean` method by providing the class type.
+ *
+ * Method Execution Flow:
+ * 1. `initBeans`: Initializes the IoC container with an optional list of predefined beans. This method handles all
+ *    initial setup including scanning components, registering beans, and handling any exceptions that occur during initialization.
+ * 2. `initWrapper`: Called by `initBeans`, this method performs the detailed initialization sequence including:
+ *    a. Registering predefined beans if provided.
+ *    b. Component scanning using annotations to discover and register additional beans.
+ * 3. `init`: Helper method called by `initWrapper` to perform scanning within a specific package, it handles:
+ *    a. Registering the container itself as a bean.
+ *    b. Scanning for implementations, configurations, and components within the package.
+ * 4. `scanImplementations`, `scanConfigurationClass`, `scanComponentClasses`: These methods are used to find and register beans based on different criteria like annotated classes or methods within classes.
+ * 5. `newInstanceWrapper`: Handles instantiation of a class, managing circular dependencies and injecting necessary dependencies.
+ * 6. `_getBean`: Overloaded methods that resolve and return beans by type, handling instantiation if not already present in the container.
+ * 7. `fieldInject`, `setterInject`: Methods for performing dependency injection into annotated fields and setter methods respectively.
+ *
+ * Exceptions:
+ * - The class handles various exceptions that may arise during the operation of the IoC container such as `IoCException`,
+ *   `IoCBeanNotFound`, and `IoCCircularDepException`. These are typically re-thrown as `IoCException` with appropriate error messages.
+ *
+ * This class is part of the `dev.keva.ioc` package and depends on various other classes within the same package and third-party
+ * libraries such as `org.reflections.Reflections` for component scanning based on annotations.
+ */
 public class KevaIoC {
     private final BeanContainer beanContainer = new BeanContainer();
     private final ImplementationContainer implementationContainer = new ImplementationContainer();
-    private final CircularDetector circularDetector = new CircularDetector();
+    private final CircularDependencyDetector circularDependencyDetector = new CircularDependencyDetector();
 
     private KevaIoC() {
     }
@@ -121,7 +159,6 @@ public class KevaIoC {
             Class<?> configurationClass = configurationClassesQ.removeFirst();
             try {
                 Object instance = configurationClass.getConstructor().newInstance();
-                circularDetector.detect(configurationClass);
                 scanConfigurationBeans(configurationClass, instance);
             } catch (IoCBeanNotFound e) {
                 configurationClassesQ.addLast(configurationClass);
@@ -160,17 +197,21 @@ public class KevaIoC {
 
     private Object newInstanceWrapper(Class<?> clazz) throws InvocationTargetException,
             IllegalAccessException, InstantiationException, NoSuchMethodException, IoCBeanNotFound, IoCCircularDepException {
-        if (beanContainer.containsBean(clazz)) {
-            return beanContainer.getBean(clazz);
+        circularDependencyDetector.startInstantiation(clazz);
+
+        try {
+            if (beanContainer.containsBean(clazz)) {
+                return beanContainer.getBean(clazz);
+            }
+
+            Object instance = newInstance(clazz);
+            beanContainer.putBean(clazz, instance);
+            fieldInject(clazz, instance);
+            setterInject(clazz, instance);
+            return instance;
+        } finally {
+            circularDependencyDetector.finishInstantiation(clazz);
         }
-
-        circularDetector.detect(clazz);
-
-        Object instance = newInstance(clazz);
-        beanContainer.putBean(clazz, instance);
-        fieldInject(clazz, instance);
-        setterInject(clazz, instance);
-        return instance;
     }
 
     private Object newInstance(Class<?> clazz) throws IllegalAccessException,
